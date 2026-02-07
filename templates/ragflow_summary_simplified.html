@@ -1,0 +1,65 @@
+<!-- 简化版 RAGFlow 验证结果显示 -->
+<script>
+function renderRagflowSummary(rag) {
+    const matched = rag.matched_items ? rag.matched_items.length : 0;
+    const missing = rag.missing_items ? rag.missing_items.length : 0;
+    const extra = rag.extra_items ? rag.extra_items.length : 0;
+
+    let statusIcon = '';
+    if (rag.status === 'pass') {
+        statusIcon = '<div style="width:48px; height:48px; background:#10b981; border-radius:50%; display:flex; align-items:center; justify-content:center;"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12" /></svg></div>';
+    } else if (rag.status === 'fail') {
+        statusIcon = '<div style="width:48px; height:48px; background:#ef4444; border-radius:50%; display:flex; align-items:center; justify-content:center;"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg></div>';
+    } else {
+        statusIcon = '<div style="width:48px; height:48px; background:#f59e0b; border-radius:50%; display:flex; align-items:center; justify-content:center;"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div>';
+    }
+
+    let summaryText = '';
+    if (missing === 0 && extra === 0) {
+        summaryText = `✅ 报告检验了 ${matched} 个项目，全部符合细则要求`;
+    } else if (missing > 0 && extra === 0) {
+        summaryText = `⚠️ 报告检验了 ${matched} 个项目，还有 ${missing} 个必检项目未检验`;
+    } else if (missing === 0 && extra > 0) {
+        summaryText = `✅ 报告检验了 ${matched} 个必检项目，另外还检验了 ${extra} 个额外项目`;
+    } else {
+        summaryText = `⚠️ 报告检验了 ${matched} 个项目，还有 ${missing} 个必检项目未检验，另有 ${extra} 个额外项目`;
+    }
+
+    return `
+        <div class="compliance-summary" style="background:#f8fafc; border-radius:8px; padding:20px; margin-bottom:20px; border:1px solid #e2e8f0;">
+            <div style="display:flex; align-items:center; gap:16px;">
+                <div style="flex-shrink:0;">
+                    ${statusIcon}
+                </div>
+                <div style="flex:1;">
+                    <div style="font-size:16px; font-weight:600; color:#1e293b; margin-bottom:4px;">
+                        ${summaryText}
+                    </div>
+                    <div style="font-size:13px; color:#64748b;">
+                        依据《食品安全监督抽检实施细则》核查
+                    </div>
+                </div>
+                <button onclick="document.getElementById('ragflow-details').style.display = document.getElementById('ragflow-details').style.display === 'none' ? 'block' : 'none'; this.textContent = this.textContent.includes('查看') ? '收起详情 ▲' : '查看详情 ▼';" style="padding:8px 16px; background:white; border:1px solid #cbd5e1; border-radius:6px; color:#475569; font-size:13px; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='#f1f5f9'; this.style.borderColor='#94a3b8';" onmouseout="this.style.background='white'; this.style.borderColor='#cbd5e1';">
+                    查看详情 ▼
+                </button>
+            </div>
+        </div>
+        <div id="ragflow-details" style="display:none; margin-bottom:20px;">
+            <div class="stats-grid" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; margin-bottom:16px;">
+                <div class="stat-card" style="background:#f0fdf4; padding:12px; border-radius:6px; text-align:center; border:1px solid #bbf7d0;">
+                    <div style="font-size:24px; font-weight:bold; color:#166534;">${matched}</div>
+                    <div style="font-size:12px; color:#15803d;">✅ 已检验项目</div>
+                </div>
+                <div class="stat-card" style="background:#fef2f2; padding:12px; border-radius:6px; text-align:center; border:1px solid #fecaca;">
+                    <div style="font-size:24px; font-weight:bold; color:#991b1b;">${missing}</div>
+                    <div style="font-size:12px; color:#b91c1c;">⚠️ 未检验项目</div>
+                </div>
+                <div class="stat-card" style="background:#eff6ff; padding:12px; border-radius:6px; text-align:center; border:1px solid #bfdbfe;">
+                    <div style="font-size:24px; font-weight:bold; color:#1e40af;">${extra}</div>
+                    <div style="font-size:12px; color:#1d4ed8;">ℹ️ 额外检验项目</div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+</script>

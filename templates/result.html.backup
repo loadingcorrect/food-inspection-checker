@@ -1,0 +1,1254 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>核查结果 - InspeX</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=2" />
+</head>
+
+<body class="page-result">
+  <div class="app-container">
+    <header class="app-header">
+      <div class="header-left">
+        <a href="{{ url_for('index') }}" class="brand-link">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+            <polyline points="14 2 14 8 20 8" />
+            <path d="M12 18v-6" />
+            <path d="M8 15h8" />
+          </svg>
+          <span class="brand-text">InspeX</span>
+        </a>
+        <div class="divider"></div>
+        <span class="page-title">核查结果</span>
+      </div>
+      <div class="header-right">
+      </div>
+    </header>
+
+    <main class="app-workspace">
+      <!-- Sidebar: File List -->
+      <aside class="sidebar-files">
+        <div class="sidebar-header">
+          <h3>文件列表</h3>
+        </div>
+        <div class="sidebar-content">
+          <ul class="file-list-nav" id="fileResultsList">
+            {% for result in results %}
+            <li class="file-nav-item {% if loop.first %}active{% endif %}" data-index="{{ loop.index0 }}"
+              onclick="displayResult({{ loop.index0 }})">
+              <div class="file-item-main">
+                <div class="file-status-icon {{ result.status }}">
+                  {% if result.status == 'success' %}
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  {% else %}
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                  {% endif %}
+                </div>
+                <div class="file-meta">
+                  <span class="file-name" title="{{ result.filename }}">{{ result.filename }}</span>
+                  <span class="file-desc">
+                    {% if result.status == 'success' %}
+                    无异常
+                    {% else %}
+                    {{ result.issue_count }} 个风险项
+                    {% endif %}
+                  </span>
+                </div>
+              </div>
+              <button class="btn-icon-sm btn-add-info" onclick="showUploadMenu(event, {{ loop.index0 }})"
+                title="上传附加信息">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+              </button>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+        <div class="sidebar-footer">
+          <button class="btn-secondary btn-block" onclick="document.getElementById('appendPdfInput').click()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+            继续上传报告
+          </button>
+          <input type="file" id="appendPdfInput" accept="application/pdf" style="display:none;"
+            onchange="appendReport(this)" />
+        </div>
+
+        <!-- Context Menu -->
+        <div class="upload-context-menu" id="uploadContextMenu" style="display:none;">
+          <button class="context-menu-item" onclick="triggerSpecificUpload('protocol')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+              <polyline points="14 2 14 8 20 8" />
+            </svg>
+            上传委托单 (PDF/图)
+          </button>
+          <button class="context-menu-item" onclick="triggerSpecificUpload('label')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+              <line x1="7" y1="7" x2="7.01" y2="7" />
+            </svg>
+            上传标签信息 (PDF/图)
+          </button>
+        </div>
+      </aside>
+
+      <!-- Main Content: Report Detail -->
+      <section class="content-detail">
+        <div class="detail-header">
+          <h2 id="detailTitle">检测详情</h2>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="tab-navigation">
+          <button class="tab-btn active" data-tab="summary">综合核对结果</button>
+          <button class="tab-btn" data-tab="standards">检验项目合规性</button>
+          <button class="tab-btn" data-tab="validation">评价依据合理性</button>
+          <button class="tab-btn" data-tab="method_compliance">检测方法合规性</button>
+          <button class="tab-btn" data-tab="standard_compliance">标准指标合理性</button>
+          <button class="tab-btn" data-tab="sample_check">样品信息核对</button>
+          <button class="tab-btn" data-tab="package">标签信息</button>
+        </div>
+
+        <div class="detail-scroll-area" id="detailContent">
+          <!-- Content injected by JS -->
+        </div>
+      </section>
+
+      <!-- Right Panel: PDF Preview -->
+      <section class="content-preview">
+        <div class="preview-header">
+          <h3 id="previewTitle">原始报告预览</h3>
+          <div class="preview-controls">
+            <button class="btn-icon-text active" id="btnShowReport" onclick="switchPdfView('report')">
+              报告
+            </button>
+            <button class="btn-icon-text" id="btnShowRules" onclick="switchPdfView('rules')">
+              细则
+            </button>
+            <button class="btn-icon-text" id="btnShowGB" onclick="switchPdfView('gb')">
+              国标
+            </button>
+          </div>
+        </div>
+        <input type="file" id="hiddenFileInput" accept="application/pdf,image/jpeg,image/png,image/jpg"
+          style="display:none;" />
+        <div class="preview-body">
+          <iframe src="" class="pdf-frame" id="pdfViewer"></iframe>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Upload Context Menu -->
+  <div id="uploadContextMenu" class="upload-menu-popover" style="display:none;">
+    <button class="btn-menu-item" onclick="triggerSpecificUpload('protocol')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
+        <line x1="16" y1="13" x2="8" y2="13" />
+        <line x1="16" y1="17" x2="8" y2="17" />
+        <polyline points="10 9 9 9 8 9" />
+      </svg>
+      上传委托单 (PDF/图)
+    </button>
+    <button class="btn-menu-item" onclick="triggerSpecificUpload('label')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+        <line x1="7" y1="7" x2="7.01" y2="7" />
+      </svg>
+      上传标签信息 (PDF/图)
+    </button>
+  </div>
+
+  <script>
+    const allResults = {{ results_json| safe }};
+    let currentResultIndex = 0;
+    let currentTab = 'summary';
+    let currentReportUrl = '';
+    let uploadTargetIndex = -1;
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      // Restore view or default to 0
+      if (allResults.length > 0) {
+        displayResult(0);
+      }
+
+      // Context menu close handler
+      document.addEventListener('click', function (e) {
+        const menu = document.getElementById('uploadContextMenu');
+        if (menu && menu.style.display !== 'none') {
+          menu.style.display = 'none';
+        }
+      });
+
+      // Tab button click handlers
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const tab = btn.dataset.tab;
+          switchTab(tab);
+        });
+      });
+    });
+
+    // Switch to a specific tab
+    function switchTab(tabName) {
+      currentTab = tabName;
+
+      // Update active tab button
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        if (btn.dataset.tab === tabName) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+
+      // Render tab content
+      if (allResults.length > 0) {
+        renderTabContent(allResults[currentResultIndex], tabName);
+      }
+    }
+
+    function displayResult(index) {
+      if (index < 0 || index >= allResults.length) return;
+
+      currentResultIndex = index;
+      const result = allResults[index];
+
+      // Update Title
+      const titleEl = document.getElementById('detailTitle');
+      if (titleEl) titleEl.textContent = result.filename;
+
+      // Save Report URL
+      currentReportUrl = result.pdf_url || '';
+
+      // Render current tab content
+      renderTabContent(result, currentTab);
+
+      // Highlight active nav
+      document.querySelectorAll('.file-nav-item').forEach((item) => {
+        if (parseInt(item.dataset.index) === index) item.classList.add('active');
+        else item.classList.remove('active');
+      });
+
+      // If we are on report view, ensure the iframe is updated
+      const activeBtn = document.querySelector('.preview-controls .btn-icon-text.active');
+      if (activeBtn && activeBtn.id === 'btnShowReport') {
+        switchPdfView('report');
+      } else if (activeBtn && activeBtn.id === 'btnShowGB') {
+        // If needed, keep GB view, but for now defaulting URL logic handles it
+      }
+    }
+
+    // --- Sidebar & Dynamic Upload Logic ---
+
+    function appendReport(input) {
+      const file = input.files[0];
+      if (!file) return;
+
+      // Show loading state
+      const btn = input.previousElementSibling;
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '<span class="loading-spinner">...</span> 正在处理';
+      btn.disabled = true;
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      fetch('/api/process_pdf', {
+        method: 'POST',
+        body: formData
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            const newResult = data.data;
+            allResults.push(newResult);
+
+            // Add to sidebar
+            const list = document.getElementById('fileResultsList');
+            const newIndex = allResults.length - 1;
+            const li = renderSidebarItem(newResult, newIndex);
+            list.appendChild(li);
+
+            // Switch to new result
+            displayResult(newIndex);
+          } else {
+            alert('处理失败: ' + data.error);
+          }
+        })
+        .catch(err => {
+          alert('上传错误: ' + err.message);
+        })
+        .finally(() => {
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+          input.value = '';
+        });
+    }
+
+    function renderSidebarItem(result, index) {
+      const li = document.createElement('li');
+      li.className = 'file-nav-item ' + (index === 0 ? 'active' : '');
+      li.dataset.index = index;
+      li.onclick = () => displayResult(index);
+
+      const statusIcon = result.status === 'success'
+        ? `<div class="file-status-icon success"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12" /></svg></div>`
+        : `<div class="file-status-icon error"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg></div>`;
+
+      const desc = result.status === 'success' ? '无异常' : `${result.issue_count} 个风险项`;
+
+      li.innerHTML = `
+            <div class="file-item-main">
+                ${statusIcon}
+                <div class="file-meta">
+                  <span class="file-name" title="${result.filename}">${result.filename}</span>
+                  <span class="file-desc">${desc}</span>
+                </div>
+            </div>
+            <button class="btn-icon-sm btn-add-info" onclick="showUploadMenu(event, ${index})" title="上传附加信息">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+            </button>
+        `;
+      return li;
+    }
+
+    // --- Context Menu & specific uploads ---
+
+    function showUploadMenu(event, index) {
+      event.stopPropagation();
+      uploadTargetIndex = index;
+
+      const menu = document.getElementById('uploadContextMenu');
+      const btn = event.currentTarget;
+      const rect = btn.getBoundingClientRect();
+
+      menu.style.display = 'block';
+      // Use fixed positioning relative to viewport
+      menu.style.top = (rect.bottom + 5) + 'px';
+
+      // Ensure menu doesn't go off screen
+      let left = rect.left;
+      if (left + 180 > window.innerWidth) { // Assuming menu width approx 180
+        left = window.innerWidth - 190;
+      }
+      menu.style.left = left + 'px';
+    }
+
+    function triggerSpecificUpload(type) {
+      // Fix: Default to currentResultIndex if triggered from main area
+      if (uploadTargetIndex === -1 && currentResultIndex >= 0) {
+        uploadTargetIndex = currentResultIndex;
+      }
+
+      const input = document.getElementById('hiddenFileInput');
+      if (input) {
+        input.dataset.uploadType = type;
+        input.click();
+      }
+      const menu = document.getElementById('uploadContextMenu');
+      if (menu) menu.style.display = 'none';
+    }
+
+    // Main file input handler (for Protocol/Label)
+    const hiddenFileInput = document.getElementById('hiddenFileInput');
+    if (hiddenFileInput) {
+      hiddenFileInput.addEventListener('change', function (e) {
+        const file = e.target.files[0];
+        if (!file || uploadTargetIndex === -1) return;
+
+        const type = this.dataset.uploadType;
+        const formData = new FormData();
+        formData.append('file', file);
+
+        let apiUrl = '';
+        if (type === 'protocol') apiUrl = '/api/upload_protocol';
+        else if (type === 'label') apiUrl = '/api/upload_label_info';
+
+        fetch(apiUrl, {
+          method: 'POST',
+          body: formData
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (data.success) {
+              const result = allResults[uploadTargetIndex];
+              if (!result.summary.additional_files) {
+                result.summary.additional_files = { protocols: [], labels: [] };
+              }
+
+              if (type === 'protocol') {
+                result.summary.additional_files.protocols.push(data.data);
+              } else {
+                result.summary.additional_files.labels.push(data.data);
+              }
+
+              // Refresh if viewing this report
+              if (currentResultIndex === uploadTargetIndex) {
+                // If on sample_check tab and uploaded protocol, refresh
+                // If on package tab and uploaded label, refresh
+                // Simply re-render current tab
+                renderTabContent(result, currentTab);
+              }
+
+            } else {
+              alert('上传失败: ' + data.error);
+            }
+          })
+          .catch(err => alert('Error: ' + err))
+          .finally(() => {
+            e.target.value = '';
+          });
+      });
+    }
+
+    // --- Tab Rendering ---
+
+    function renderTabContent(result, tab) {
+      const detailContent = document.getElementById('detailContent');
+      let html = '';
+
+      if (tab === 'summary') {
+        html = renderSummaryTab(result);
+      } else if (tab === 'validation') {
+        html = renderValidationTab(result);
+      } else if (tab === 'sample_check') {
+        html = renderSampleCheckTab(result);
+      } else if (tab === 'package') {
+        html = renderPackageTab(result);
+      } else if (tab === 'standard_compliance') {
+        html = renderStandardComplianceTab(result);
+      } else if (tab === 'method_compliance') {
+        html = renderMethodComplianceTab(result);
+      } else if (tab === 'standards') {
+        html = renderStandardsTab(result);
+      }
+
+      detailContent.innerHTML = html;
+    }
+
+    function renderSummaryTab(result) {
+      let html = '';
+      const s = result.summary;
+
+      // Overall Verification Status
+      const overallPassed = !result.issues || result.issues.length === 0;
+      html += `
+        <div class="overall-status ${overallPassed ? 'passed' : 'failed'}">
+          <div class="status-icon">
+            ${overallPassed
+          ? '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>'
+          : '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>'}
+          </div>
+          <div class="status-content">
+            <h2 class="status-title">${overallPassed ? '验证通过' : '验证未通过'}</h2>
+            <p class="status-description">
+              ${overallPassed
+          ? '所有验证项目均符合要求'
+          : `检测到 ${result.issues.length} 个问题需要处理`}
+            </p>
+          </div>
+        </div>
+      `;
+
+      // Verification Modules Grid
+      html += `
+        <div class="section-block">
+          <h3 class="block-title">验证模块概览</h3>
+          <div class="verification-modules-grid">
+      `;
+
+      // Define all verification modules
+      const modules = [
+        {
+          id: 'standards',
+          title: '检验项目合规性',
+          icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>',
+          status: s.standards_compliance_status || 'unknown',
+          description: '验证检验项目是否符合规定'
+        },
+        {
+          id: 'validation',
+          title: '评价依据合理性',
+          icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>',
+          status: s.regulatory_basis_consistent !== undefined ? (s.regulatory_basis_consistent ? 'passed' : 'failed') : 'unknown',
+          description: '验证法规标准依据的合理性'
+        },
+        {
+          id: 'method_compliance',
+          title: '检测方法合规性',
+          icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>',
+          status: s.method_compliance_status || 'unknown',
+          description: '验证检测方法的合规性和有效性'
+        },
+        {
+          id: 'standard_compliance',
+          title: '标准指标合理性',
+          icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>',
+          status: s.standard_indicators_status || 'unknown',
+          description: '验证标准指标设置的合理性'
+        },
+        {
+          id: 'sample_check',
+          title: '样品信息核对',
+          icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>',
+          status: s.sample_info_status || 'unknown',
+          description: '核对样品信息与委托单一致性'
+        },
+        {
+          id: 'package',
+          title: '标签信息',
+          icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>',
+          status: s.label_info_status || 'unknown',
+          description: '验证产品标签信息完整性'
+        }
+      ];
+
+      // Render module cards
+      modules.forEach(module => {
+        const statusClass = module.status === 'passed' ? 'passed' : (module.status === 'failed' ? 'failed' : 'unknown');
+        const statusText = module.status === 'passed' ? '通过' : (module.status === 'failed' ? '未通过' : '待验证');
+        const statusIcon = module.status === 'passed'
+          ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>'
+          : (module.status === 'failed'
+            ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'
+            : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>');
+
+        html += `
+          <div class="module-card ${statusClass}" onclick="switchTab('${module.id}')">
+            <div class="module-icon">
+              ${module.icon}
+            </div>
+            <div class="module-content">
+              <h4 class="module-title">${module.title}</h4>
+              <p class="module-description">${module.description}</p>
+            </div>
+            <div class="module-status">
+              <span class="status-badge ${statusClass}">
+                ${statusIcon}
+                <span>${statusText}</span>
+              </span>
+            </div>
+            <div class="module-arrow">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+            </div>
+          </div>
+        `;
+      });
+
+      html += `
+          </div>
+        </div>
+      `;
+
+      // Basic Info Summary
+      html += `
+        <div class="section-block">
+          <h3 class="block-title">基本信息</h3>
+          <div class="info-grid-clean">
+            <div class="info-cell"><span class="label">食品名称</span><span class="value">${s.food_name || '<span class="empty">–</span>'}</span></div>
+            <div class="info-cell"><span class="label">生产日期</span><span class="value">${s.production_date || '<span class="empty">–</span>'}</span></div>
+          </div>
+        </div>
+      `;
+
+      return html;
+    }
+
+    function renderValidationTab(result) {
+      const s = result.summary;
+      const rag = s.ragflow_verification;
+      let html = '';
+
+      html += `
+        <div class="section-block">
+          <h3 class="block-title">法规/标准依据合理性</h3>
+          <div class="evaluation-section">
+      `;
+
+      if (rag) {
+        const hasIssues = rag.basis_issues && rag.basis_issues.length > 0;
+
+        // Collect required basis from matched items for display
+        const requiredBases = new Set();
+        if (rag.matched_items) {
+          rag.matched_items.forEach(m => {
+            if (m.required_basis) requiredBases.add(m.required_basis);
+          });
+        }
+
+        html += `
+            <!-- Overall Result -->
+            <div class="eval-result" style="margin-bottom:20px;">
+              ${!hasIssues
+            ? '<div class="result-badge success" style="width:100%; justify-content:center; padding:12px; font-size:15px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg><span>判定依据符合细则要求</span></div>'
+            : '<div class="result-badge error" style="width:100%; justify-content:center; padding:12px; font-size:15px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg><span>存在判定依据不一致</span></div>'}
+            </div>
+
+            <div class="eval-subsection">
+              <h4 class="subsection-title">细则要求的依据标准</h4>
+              <div class="standard-list">
+                ${requiredBases.size > 0
+            ? Array.from(requiredBases).map(code => `<span class="standard-tag">${code}</span>`).join('')
+            : '<span class="standard-tag neutral">无明确统一依据要求</span>'}
+              </div>
+            </div>
+
+            <!-- Issues List -->
+            ${hasIssues ? `
+              <div class="eval-subsection">
+                <h4 class="subsection-title" style="color:#b91c1c;">发现的问题</h4>
+                <div class="issues-list" style="background:#fef2f2; padding:12px; border-radius:6px; border:1px solid #fee2e2;">
+                   ${rag.basis_issues.map(issue => `
+                      <div class="issue-item" style="margin-bottom:8px; font-size:13px; color:#991b1b;">
+                         <strong>${issue.item}:</strong> 细则要求依据 ${issue.expected}, 实际报告依据 ${issue.actual}
+                      </div>
+                   `).join('')}
+                </div>
+              </div>
+            ` : ''}
+
+            <!-- Report Standards (Extracted) -->
+            <div class="eval-subsection">
+               <h4 class="subsection-title">报告引用的标准文件</h4>
+               <div class="standard-list">
+                  ${s.gb_codes && s.gb_codes.length > 0
+            ? s.gb_codes.map(code => `<span class="standard-tag info">${code}</span>`).join('')
+            : '<span style="color:#94a3b8; font-size:12px;">未在报告中提取到标准号</span>'}
+               </div>
+            </div>
+          `;
+      } else {
+        html += `
+             <div class="info-scrim" style="padding:24px; text-align:center; color:#64748b;">
+                <p>未执行自动依据验证。</p>
+             </div>
+           `;
+      }
+
+      html += `
+          </div>
+        </div>
+      `;
+      return html;
+    }
+
+    function renderMethodComplianceTab(result) {
+      const s = result.summary;
+      const rag = s.ragflow_verification;
+      let html = '';
+
+      html += `
+        <div class="section-block">
+          <h3 class="block-title">检测方法合规性验证</h3>
+          <div class="evaluation-section">
+      `;
+
+      if (rag && rag.matched_items && rag.matched_items.length > 0) {
+        // Process each matched item to determine method compliance
+        rag.matched_items.forEach(item => {
+          // Find if there is an issue for this item
+          const issue = rag.method_issues ? rag.method_issues.find(i => i.item === item.name) : null;
+          const isCompliant = !issue;
+
+          // If no required method, it's neutral/info
+          const hasRequirement = !!item.required_method;
+
+          // Skip if essentially empty (optional)
+          if (!hasRequirement && !item.report_method) return;
+
+          html += `
+              <div class="method-verification-item ${isCompliant ? (hasRequirement ? 'compliant' : 'info') : 'non-compliant'}">
+                <div class="method-item-header">
+                  <h5 class="item-name">${item.name || '检验项目'}</h5>
+                  ${hasRequirement
+              ? (isCompliant
+                ? '<span class="compliance-badge success"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> 方法合规</span>'
+                : '<span class="compliance-badge error"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> 方法不一致</span>')
+              : '<span class="compliance-badge neutral">无特定方法要求</span>'}
+                </div>
+
+                <div class="method-details">
+                  <div class="method-row">
+                    <span class="method-label">细则要求方法:</span>
+                    <div class="method-tags">
+                      <span class="method-tag">${item.required_method || '未指定'}</span>
+                    </div>
+                  </div>
+
+                  <div class="method-row">
+                    <span class="method-label">报告使用方法:</span>
+                    <span class="method-value ${isCompliant ? 'valid' : 'invalid'}">${item.report_method || '未识别'}</span>
+                  </div>
+                  
+                  ${issue ? `
+                    <div class="method-issues" style="background:#fff1f2; color:#9f1239; padding:8px; border-radius:4px; margin-top:8px; font-size:12px;">
+                      <strong>存在风险:</strong> ${issue.issue} (应为: ${issue.expected}, 实际: ${issue.actual})
+                    </div>
+                  ` : ''}
+                </div>
+              </div>
+            `;
+        });
+      } else {
+        // No RAG data or no matched items
+        html += `
+          <div class="info-scrim" style="padding:24px; text-align:center; color:#64748b;">
+             <p>未获取到足够的检测方法对比数据。</p>
+          </div>
+        `;
+      }
+
+      html += `
+          </div>
+        </div>
+      `;
+      return html;
+    }
+
+    function renderSampleCheckTab(result) {
+      let html = '';
+      const s = result.summary;
+      const files = s.additional_files || { protocols: [], labels: [] };
+      html += `
+    <div class="section-block">
+      <h3 class="block-title">样品信息核对 (委托单)</h3>
+      <div class="check-instruction" style="margin-bottom:15px; color:#64748b; font-size:13px;">
+         请上传委托单以核对：样品名称、抽样地址、送检单位等信息。
+      </div>
+      <div id="protocolList" class="file-display-list">
+        ${files.protocols.map(f => renderFileCard(f)).join('')}
+      </div>
+      ${files.protocols.length === 0 ? `
+        <div class="empty-state-action" style="text-align:center; padding:30px; border:1px dashed #cbd5e1; border-radius:6px; background:#f8fafc;">
+             <p style="color:#94a3b8; margin-bottom:10px;">暂无委托单信息</p>
+             <button class="btn-secondary" onclick="triggerSpecificUpload('protocol')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                上传委托单
+             </button>
+        </div>
+      ` : ''}
+    </div>
+  `;
+      return html;
+    }
+
+    function renderPackageTab(result) {
+      let html = '';
+      const s = result.summary;
+      const files = s.additional_files || { protocols: [], labels: [] };
+
+      // Labels Only
+      html += `
+    <div class="section-block">
+      <h3 class="block-title">标签信息 (附加信息)</h3>
+      <div id="labelList" class="file-display-list">
+         ${files.labels.map(f => renderFileCard(f)).join('')}
+      </div>
+      ${files.labels.length === 0 ? `
+         <div class="empty-state-action" style="text-align:center; padding:30px; border:1px dashed #cbd5e1; border-radius:6px; background:#f8fafc;">
+             <p style="color:#94a3b8; margin-bottom:10px;">暂无标签信息</p>
+             <button class="btn-secondary" onclick="triggerSpecificUpload('label')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                上传标签信息
+             </button>
+        </div>
+      ` : ''}
+    </div>
+  `;
+
+      return html;
+    }
+
+    // 3. Package Image (Label Info) - keep compatible with old logic or merge?
+    // User said "Label Info IS Package Image".
+    // Let's add the OCR result display if available from the images.
+    // Currently our upload_label_info endpoint returns basic file info, not OCR.
+    // The original `upload_package_image` did OCR.
+    // Ideally, if a user uploads a label, we might want to OCR it. 
+    // For now, I'll keep the section simple to file display as requested by "Upload... optional".
+    function renderFileCard(file) {
+      if (file.file_type === 'pdf') {
+        return `
+            <div class="uploaded-file-card">
+              <div class="file-card-header">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+                <span class="file-name">${file.filename}</span>
+                <button class="btn-view-file" onclick="switchPdfView('${file.file_url}')">预览</button>
+              </div>
+              <div class="file-card-meta">上传时间: ${file.upload_time}</div>
+            </div>`;
+      } else {
+        // Logic for labels with OCR info
+        let infoHtml = '';
+        const hasInfo = file.product_type || file.standard_code;
+
+        if (hasInfo || file.raw_text) {
+          infoHtml = `
+                    <div class="file-ocr-info" style="margin:8px 0; padding:10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:4px; font-size:13px;">
+                        ${file.product_type ? `<div style="margin-bottom:4px;"><strong>产品类型:</strong> <span style="color:#0f172a;">${file.product_type}</span></div>` : ''}
+                        ${file.standard_code ? `<div style="margin-bottom:4px;"><strong>产品标准号:</strong> <span style="color:#0f172a;">${file.standard_code}</span></div>` : ''}
+                        
+                        ${!hasInfo && file.raw_text ? `<div style="margin-top:4px; color:#64748b; font-size:12px;"><em>未识别到关键字段，OCR结果如下:</em></div>` : ''}
+                        
+                        ${file.raw_text ? `<details ${!hasInfo ? 'open' : ''} style="margin-top:6px;"><summary style="cursor:pointer;color:#94a3b8;font-size:12px;">查看 OCR 原始文本</summary><div style="white-space:pre-wrap;margin-top:4px;color:#64748b;font-size:11px;max-height:150px;overflow-y:auto;background:#fff;padding:4px;border:1px solid #eee;">${file.raw_text}</div></details>` : ''}
+                    </div>
+                 `;
+        } else {
+          // No info and no raw text?
+          infoHtml = '<div style="margin-top:4px; color:#94a3b8; font-size:12px;"><em>暂无 OCR 信息</em></div>';
+        }
+
+        return `
+            <div class="uploaded-file-card">
+              <div class="file-card-header">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                <span class="file-name">${file.filename}</span>
+              </div>
+              <div class="file-card-meta">上传时间: ${file.upload_time}</div>
+              ${infoHtml}
+              <div class="uploaded-image-container">
+                <img src="${file.file_url}" class="uploaded-image" alt="标签信息" />
+              </div>
+            </div>`;
+      }
+    }
+
+    function renderStandardComplianceTab(result) {
+      const s = result.summary;
+      const rag = s.ragflow_verification;
+      const reportItems = result.items || [];
+      let html = '';
+
+      html += `
+        <div class="section-block">
+          <h3 class="block-title">标准指标合理性核查</h3>
+          <div class="compliance-header" style="background:#f8fafc; padding:12px 16px; border-radius:6px; margin-bottom:16px; border-left:3px solid #3b82f6;">
+            <div style="font-size:13px; color:#64748b;">
+              核查说明：系统自动从国标文件（知识库）中检索各项目的标准限量，并与报告中的标准要求进行交叉验证。
+            </div>
+          </div>
+      `;
+
+      if (rag && reportItems.length > 0 && rag.evidence) {
+        // Filter only indicator evidences
+        const indicatorEvidence = rag.evidence.filter(e => e.type === 'indicator');
+
+        if (indicatorEvidence.length > 0) {
+          html += `
+              <div class="table-container">
+                <table class="clean-table compliance-table" style="font-size:13px;">
+                  <thead>
+                    <tr>
+                      <th style="width:120px;">检测项目</th>
+                      <th style="width:140px;">报告引用的标准值</th>
+                      <th style="width:140px;">RAG检索的国标要求</th>
+                      <th style="width:120px;">实测值</th>
+                      <th style="width:140px;">佐证来源</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+             `;
+
+          // Iterate through report items or just the ones we have evidence for?
+          // Better to iterate all report items that have RAG info to show coverage
+          // But we only queried a subset in backend for demo.
+          // Let's show the ones we have evidence for, plus unmatched ones maybe?
+          // For simplicity, iterate reportItems and match with evidence.
+
+          reportItems.forEach(item => {
+            // Try to find matching evidence
+            const evidence = indicatorEvidence.find(e => e.item && (e.item.includes(item.item) || item.item.includes(e.item)));
+
+            // If no evidence and not in matched list, maybe skip to avoid clutter?
+            // But user wants to see what was checked.
+            // Backend only checked top 3 items for demo.
+            if (!evidence) return; // Only show what we checked
+
+            const hasIssue = rag.indicator_issues && rag.indicator_issues.find(i => i.includes(item.item));
+
+            html += `
+                    <tr>
+                      <td style="font-weight:500; color:#0f172a;">${item.item}</td>
+                      <td>
+                         <span style="color:#64748b;">${item.standard || '-'}</span> 
+                         <span style="color:#94a3b8; font-size:11px;">${item.unit || ''}</span>
+                      </td>
+                      <td>
+                         <div style="font-size:12px; color:#0f172a; white-space:pre-wrap; max-height:80px; overflow-y:auto;">${evidence.content || '未检索到具体数值'}</div>
+                      </td>
+                      <td style="color:#475569;">${item.value || '-'}</td>
+                      <td style="color:#94a3b8; font-size:11px;">
+                         ${evidence.chunk_id ? `
+                            <div style="display:flex; flex-direction:column; gap:4px;">
+                                <span class="source-tag">RAG 知识库</span>
+                                ${evidence.page_num ? `<a href="javascript:void(0)" onclick="switchPdfView('rules', ${evidence.page_num})" class="page-link-badge">第 ${evidence.page_num} 页</a>` : ''}
+                            </div>
+                         ` : ''}
+                      </td>
+                    </tr>
+                 `;
+          });
+
+          html += `</tbody></table></div>`;
+
+          if (rag.indicator_issues && rag.indicator_issues.length > 0) {
+            html += `
+                   <div class="issues-alert" style="margin-top:20px; background:#fff1f2; border:1px solid #ffe4e6; padding:12px; border-radius:6px;">
+                      <h5 style="color:#e11d48; margin:0 0 8px 0; font-size:13px;">潜在合规风险:</h5>
+                      <ul style="margin:0 0 0 20px; color:#be123c; font-size:12px;">
+                        ${rag.indicator_issues.map(i => `<li>${i}</li>`).join('')}
+                      </ul>
+                   </div>
+                 `;
+          }
+
+        } else {
+          html += `<div class="info-scrim" style="padding:20px; text-align:center; color:#94a3b8;">暂无标准指标的检索结果 (可能未找到对应国标)。</div>`;
+        }
+      } else {
+        html += `
+          <div class="card info-card">
+            <div class="card-header">
+              <svg class="icon-info" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+              </svg>
+              <span>暂无标准指标数据</span>
+            </div>
+            <div style="padding:12px 16px; color:#64748b; font-size:13px;">
+              <p>请上传新报告以触发自动验证。</p>
+            </div>
+          </div>
+        `;
+      }
+
+      html += `</div>`;
+
+      // Keep styles
+      html += `
+        <style>
+          .compliance-badge.match { background: #d1fae5; color: #065f46; }
+          .compliance-badge.mismatch { background: #fee2e2; color: #991b1b; }
+          .compliance-badge.compliant { background: #d1fae5; color: #065f46; }
+          .compliance-badge.non-compliant { background: #fee2e2; color: #991b1b; }
+          .compliance-table td { vertical-align: middle; }
+        </style>
+      `;
+
+      return html;
+    }
+
+    function renderStandardsTab(result) {
+      const s = result.summary;
+      const rag = s.ragflow_verification;
+      let html = '';
+
+      if (rag && (rag.status || rag.matched_items)) {
+        // RAGFlow Data Available
+        const statusClass = rag.status === 'pass' ? 'success' : (rag.status === 'fail' ? 'error' : 'warning');
+        const statusText = rag.status === 'pass' ? '合规' : (rag.status === 'fail' ? '不合规' : '需人工复核');
+        const statusIcon = rag.status === 'pass'
+          ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>'
+          : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+
+        html += `
+          <div class="section-block">
+            <h3 class="block-title">检验项目合规性核查</h3>
+            
+            <div class="compliance-header" style="background:#f8fafc; padding:16px; border-radius:8px; margin-bottom:20px; border:1px solid #e2e8f0;">
+               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                  <div>
+                    <h4 style="margin:0 0 4px 0; font-size:16px; color:#1e293b;">核查结果: <span class="status-text ${statusClass}" style="font-weight:600;">${statusText}</span></h4>
+                    <div style="font-size:13px; color:#64748b;">依据 RAGFlow 检索到的《食品安全监督抽检实施细则》</div>
+                  </div>
+                  <div class="status-icon-large ${statusClass}" style="padding:8px; border-radius:50%; background:rgba(0,0,0,0.05);">
+                    ${statusIcon}
+                  </div>
+               </div>
+               
+               ${rag.evidence_pages && rag.evidence_pages.length > 0 ? `
+                 <div style="margin-top:12px; padding-top:12px; border-top:1px solid #e2e8f0;">
+                   <div style="font-size:12px; color:#64748b; margin-bottom:6px;">📄 检索到的细则页码:</div>
+                   <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                     ${rag.evidence_pages.sort((a,b) => a-b).map(page => `
+                       <span style="background:#3b82f6; color:white; padding:4px 10px; border-radius:4px; font-size:12px; font-weight:500;">
+                         第 ${page} 页
+                       </span>
+                     `).join('')}
+                   </div>
+                   <div style="font-size:11px; color:#94a3b8; margin-top:6px;">
+                     共检索到 ${rag.evidence_count || 0} 个相关片段
+                   </div>
+                 </div>
+               ` : ''}
+            </div>
+
+            ${rag.issues && rag.issues.length > 0 ? `
+              <div class="issues-alert" style="background:#fef2f2; border:1px solid #fee2e2; border-radius:6px; padding:12px; margin-bottom:20px;">
+                <h5 style="color:#991b1b; margin:0 0 8px 0; font-size:14px; font-weight:600;">发现的问题:</h5>
+                <ul style="margin:0 0 0 20px; padding:0; color:#b91c1c; font-size:13px;">
+                  ${rag.issues.map(i => `<li>${i}</li>`).join('')}
+                </ul>
+              </div>
+            ` : ''}
+
+            <!-- Comparison Statistics -->
+            <div class="stats-grid" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; margin-bottom:24px;">
+               <div class="stat-card" style="background:#f0fdf4; padding:12px; border-radius:6px; text-align:center;">
+                  <div style="font-size:20px; font-weight:bold; color:#166534;">${rag.matched_items ? rag.matched_items.length : 0}</div>
+                  <div style="font-size:12px; color:#15803d;">匹配项目</div>
+               </div>
+               <div class="stat-card" style="background:#fef2f2; padding:12px; border-radius:6px; text-align:center;">
+                  <div style="font-size:20px; font-weight:bold; color:#991b1b;">${rag.missing_items ? rag.missing_items.length : 0}</div>
+                  <div style="font-size:12px; color:#b91c1c;">缺失必检项</div>
+               </div>
+               <div class="stat-card" style="background:#eff6ff; padding:12px; border-radius:6px; text-align:center;">
+                  <div style="font-size:20px; font-weight:bold; color:#1e40af;">${rag.extra_items ? rag.extra_items.length : 0}</div>
+                  <div style="font-size:12px; color:#1d4ed8;">报告额外项</div>
+               </div>
+            </div>
+
+            <!-- Missing Items Table (Critical) -->
+            ${rag.missing_items && rag.missing_items.length > 0 ? `
+              <div class="table-group" style="margin-bottom:24px;">
+                <h4 style="font-size:14px; color:#991b1b; margin-bottom:10px; border-left:3px solid #ef4444; padding-left:8px;">❌ 缺失的必检项目 (细则要求但报告未检)</h4>
+                <div class="table-container">
+                  <table class="clean-table" style="width:100%;">
+                    <thead>
+                      <tr><th style="color:#991b1b;">项目名称 (细则)</th></tr>
+                    </thead>
+                    <tbody>
+                      ${rag.missing_items.map(item => `
+                        <tr><td style="color:#b91c1c; background:#fef2f2;">${item}</td></tr>
+                      `).join('')}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ` : ''}
+
+            <!-- Matched Items Table -->
+            <div class="table-group" style="margin-bottom:24px;">
+                <h4 style="font-size:14px; color:#166534; margin-bottom:10px; border-left:3px solid #10b981; padding-left:8px;">✅ 已匹配的检验项目</h4>
+                <div class="table-container">
+                  <table class="clean-table" style="width:100%;">
+                    <thead>
+                      <tr>
+                        <th>项目名称</th>
+                        <th>细则要求方法</th>
+                        <th>报告使用方法</th>
+                        <th>方法合规性</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${rag.matched_items && rag.matched_items.length > 0 ? rag.matched_items.map(item => {
+          // Check method compliance result from method_issues list usually, but here we can infer or use logic
+          // Ideally backend should pass 'is_compliant' per item in matched_items, 
+          // but currently we have 'method_issues' list separately.
+          // Let's check status from method_issues
+          const methodIssue = rag.method_issues ? rag.method_issues.find(i => i.item === item.name) : null;
+          const isCompliant = !methodIssue;
+
+          return `
+                        <tr>
+                          <td style="font-weight:500;">${item.name}</td>
+                          <td style="font-size:12px; color:#64748b;">${item.required_method || '<span style="color:#cbd5e1">-</span>'}</td>
+                          <td style="font-size:12px; color:#64748b;">${item.report_method || '<span style="color:#cbd5e1">-</span>'}</td>
+                          <td>
+                            ${item.required_method ? (
+              isCompliant
+                ? '<span class="badge-sm success">符合</span>'
+                : '<span class="badge-sm error">方法不一致</span>'
+            ) : '<span class="badge-sm neutral">无特定要求</span>'}
+                          </td>
+                        </tr>`;
+        }).join('') : '<tr><td colspan="4" style="text-align:center;color:#94a3b8;">无匹配项目</td></tr>'}
+                    </tbody>
+                  </table>
+                </div>
+            </div>
+
+             <!-- Extra Items Table -->
+             ${rag.extra_items && rag.extra_items.length > 0 ? `
+              <details>
+                <summary style="font-size:13px; color:#64748b; cursor:pointer; margin-bottom:10px;">查看报告中的其他项目 (${rag.extra_items.length})</summary>
+                <div class="table-container">
+                  <table class="clean-table" style="width:100%;">
+                    <thead><tr><th>项目名称 (报告实测)</th></tr></thead>
+                    <tbody>
+                      ${rag.extra_items.map(item => `
+                        <tr><td style="color:#64748b;">${item}</td></tr>
+                      `).join('')}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            ` : ''}
+
+          </div>
+        `;
+      } else {
+        // Fallback to manual query or empty state
+        html += `
+        <div class="section-block">
+          <h3 class="block-title">查询检验标准</h3>
+          <div class="info-scrim" style="background:#f8fafc; padding:20px; text-align:center; border-radius:8px; border:1px dashed #cbd5e1;">
+            <p style="color:#64748b; margin-bottom:15px;">当前报告未自动进行 RAGFlow 合规性验证 (可能是旧报告或缺少关键信息)。</p>
+            
+            <div class="query-input-area" style="max-width:400px; margin:0 auto;">
+               <div class="input-group">
+                 <input type="text" id="foodNameInput" value="${result.summary.food_name || ''}" placeholder="请输入食品名称手动查询" />
+               </div>
+               <button class="btn-query-standards" onclick="queryStandards()">
+                 手动查询细则
+               </button>
+            </div>
+          </div>
+          <div id="standardsResultDisplay" style="display:none; margin-top:20px;"></div>
+        </div>`;
+      }
+      return html;
+    }
+
+    function queryStandards() {
+      const foodName = document.getElementById('foodNameInput').value.trim();
+      if (!foodName) { alert('请输入食品名称'); return; }
+
+      const display = document.getElementById('standardsResultDisplay');
+      if (display) {
+        display.style.display = 'block';
+        display.innerHTML = '<p style="text-align:center;padding:20px;">正在查询...</p>';
+      }
+
+      fetch('/api/query_standards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ food_name: foodName })
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            let html = `<div class="standards-list">`;
+            if (data.data.results && data.data.results.length > 0) {
+              data.data.results.forEach(item => {
+                const pageLink = item.file_url ? `<a href="javascript:void(0)" onclick="switchPdfView('${item.file_url}', ${item.page || 1})" class="page-link">页 ${item.page || 1}</a>` : '';
+                const contentHtml = parseMarkdown(item.content);
+                html += `<div class="standard-item-card"><div class="standard-header"><span class="source-tag">${item.source}</span><span class="standard-title">${item.title}</span>${pageLink}</div><div class="standard-content formatted-content">${contentHtml}</div></div>`;
+              });
+            } else {
+              html += `<p class="empty-hint">未找到相关标准/细则。</p>`;
+            }
+            html += `</div>`;
+            display.innerHTML = html;
+          } else {
+            display.innerHTML = '查询失败: ' + data.error;
+          }
+        });
+    }
+
+    function parseMarkdown(text) {
+      if (!text) return '';
+      const tableRegex = /\|(.+)\|\n\|([-:| ]+)\|\n((?:\|.*\|\n?)*)/g;
+      let html = text.replace(tableRegex, (match, header, separator, body) => {
+        const headers = header.split('|').map(h => h.trim()).filter(h => h);
+        const rows = body.trim().split('\n');
+        let tableHtml = '<div class="table-container"><table class="clean-table markdown-table"><thead><tr>';
+        headers.forEach(h => { tableHtml += `<th>${h}</th>`; });
+        tableHtml += '</tr></thead><tbody>';
+        rows.forEach(row => {
+          const cells = row.split('|').map(c => c.trim()).filter((c, i) => i > 0 && i < row.split('|').length - 1);
+          if (cells.length) {
+            tableHtml += '<tr>';
+            cells.forEach(c => { tableHtml += `<td>${c}</td>`; });
+            tableHtml += '</tr>';
+          }
+        });
+        tableHtml += '</tbody></table></div>';
+        return tableHtml;
+      });
+      if (!tableRegex.test(text)) {
+        html = html.replace(/\n/g, '<br/>');
+      }
+      return html;
+    }
+
+    function switchPdfView(target, page) {
+      const pdfViewer = document.getElementById('pdfViewer');
+      const headerTitle = document.getElementById('previewTitle');
+      if (!pdfViewer) return;
+
+      let url = '';
+      let title = '';
+      let activeBtnId = '';
+
+      if (target === 'report') {
+        url = currentReportUrl;
+        title = "原始报告预览";
+        activeBtnId = 'btnShowReport';
+      } else if (target === 'rules') {
+        url = "/static/files/2025年食品安全监督抽检实施细则.pdf";
+        title = "实施细则预览";
+        activeBtnId = 'btnShowRules';
+      } else if (target === 'gb') {
+        url = "/static/files/GB 2763.1-2022 农残.pdf";
+        title = "国标文件预览";
+        activeBtnId = 'btnShowGB';
+      } else {
+        url = target;
+        title = "文件预览";
+        if (url.includes('细则')) activeBtnId = 'btnShowRules';
+        else if (url.includes('GB') || url.includes('2763')) activeBtnId = 'btnShowGB';
+        else activeBtnId = '';
+      }
+
+      if (url) {
+        const fullUrl = page ? `${url}#page=${page}` : url;
+        pdfViewer.src = fullUrl;
+        if (headerTitle) headerTitle.textContent = title;
+
+        document.querySelectorAll('.preview-controls .btn-icon-text').forEach(btn => {
+          btn.classList.remove('active');
+        });
+
+        if (activeBtnId) {
+          const btn = document.getElementById(activeBtnId);
+          if (btn) btn.classList.add('active');
+        }
+      }
+    }
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', function () {
+        const tab = this.getAttribute('data-tab');
+        currentTab = tab;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        const result = allResults[currentResultIndex];
+        renderTabContent(result, tab);
+      });
+    });
+  </script>
+</body>
+
+</html>

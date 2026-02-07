@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>检验报告核查系统</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=2" />
+</head>
+
+<body class="page-upload">
+  <div class="upload-container">
+    <header class="upload-header">
+      <div class="brand-logo">
+        <!-- Logo Icon -->
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+          <polyline points="14 2 14 8 20 8" />
+          <path d="M12 18v-6" />
+          <path d="M8 15h8" />
+        </svg>
+        <span class="brand-name">InspeX</span>
+      </div>
+      <h1 class="hero-title">智能检验报告核查</h1>
+      <p class="hero-subtitle">拖拽上传 PDF 文件，体验医疗级的精准自动审核。</p>
+    </header>
+
+    <main class="upload-main">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+      <div class="flash-messages">
+        {% for category, message in messages %}
+        <div class="flash-message {{ category }}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <span>{{ message }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% endwith %}
+
+      <form class="upload-form" method="post" enctype="multipart/form-data" id="uploadForm">
+        <div class="upload-area" id="dropZone">
+          <input type="file" name="pdfs" accept="application/pdf,image/jpeg,image/png,image/jpg" multiple id="fileInput"
+            class="file-input-hidden" />
+          <div class="upload-content">
+            <div class="upload-icon-wrapper">
+              <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+            </div>
+            <div class="upload-text">
+              <span class="link-text">点击选择文件</span>
+              <span class="separator">或</span>
+              <span class="drag-text">拖拽至此</span>
+            </div>
+            <p class="upload-hint">支持 PDF 和图片格式（JPG、PNG）</p>
+          </div>
+        </div>
+
+        <div class="file-queue" id="fileList"></div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn-primary" id="submitBtn" disabled>
+            <span>开始智能核查</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <line x1="5" y1="12" x2="19" y2="12" />
+              <polyline points="12 5 19 12 12 19" />
+            </svg>
+          </button>
+        </div>
+      </form>
+    </main>
+
+    <footer class="upload-footer">
+      <p>© 2025 InspeX System. Designed for Precision.</p>
+    </footer>
+  </div>
+
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const dropZone = document.getElementById('dropZone');
+    const fileList = document.getElementById('fileList');
+    const submitBtn = document.getElementById('submitBtn');
+
+    // 拖拽效果
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      dropZone.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropZone.addEventListener(eventName, () => dropZone.classList.add('highlight'), false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropZone.addEventListener(eventName, () => dropZone.classList.remove('highlight'), false);
+    });
+
+    dropZone.addEventListener('drop', handleDrop, false);
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    function handleDrop(e) {
+      const dt = e.dataTransfer;
+      const files = dt.files;
+      handleFiles(files);
+    }
+
+    fileInput.addEventListener('change', function (e) {
+      handleFiles(this.files);
+    });
+
+    function handleFiles(files) {
+      // 创建一个新的 DataTransfer 对象来更新 input 的 files
+      const dt = new DataTransfer();
+      Array.from(files).forEach(file => dt.items.add(file));
+      fileInput.files = dt.files;
+
+      updateFileList(files);
+    }
+
+    function updateFileList(files) {
+      if (files.length === 0) {
+        fileList.innerHTML = '';
+        submitBtn.disabled = true;
+        return;
+      }
+
+      let html = '<div class="queue-header">待处理文件 (' + files.length + ')</div><ul class="queue-list">';
+
+      Array.from(files).forEach((file) => {
+        html += `
+            <li class="queue-item">
+              <div class="queue-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+              </div>
+              <span class="queue-name">${file.name}</span>
+              <span class="queue-size">${(file.size / 1024 / 1024).toFixed(2)} MB</span>
+            </li>
+          `;
+      });
+      html += '</ul>';
+
+      fileList.innerHTML = html;
+      submitBtn.disabled = false;
+    }
+  </script>
+</body>
+
+</html>
