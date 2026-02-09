@@ -1,30 +1,46 @@
 // 页码点击跳转功能
-// 在页面加载完成后,为所有页码标签添加点击事件
+// 使用事件委托机制,避免重复绑定事件处理器
 
 document.addEventListener('DOMContentLoaded', function () {
-    // 为所有页码标签添加点击事件
-    function addPageClickHandlers() {
+    // 使用事件委托:在 document 上监听所有点击事件
+    document.addEventListener('click', function (e) {
+        // 查找被点击的元素或其父元素是否是页码标签
+        const badge = e.target.closest('.page-badge, [data-page]');
+
+        if (badge && badge.hasAttribute('data-page')) {
+            const page = badge.getAttribute('data-page');
+
+            if (page && typeof switchPdfView === 'function') {
+                // 跳转到细则对应页面
+                switchPdfView('rules', parseInt(page));
+
+                // 视觉反馈:点击效果
+                const originalBg = badge.style.background;
+                badge.style.background = '#1d4ed8';
+                setTimeout(() => {
+                    badge.style.background = originalBg || '#3b82f6';
+                }, 300);
+            }
+        }
+    });
+
+    // 初始化样式:为所有页码标签添加基础样式和悬停效果
+    function initPageBadgeStyles() {
         const pageBadges = document.querySelectorAll('.page-badge, [data-page]');
 
         pageBadges.forEach(badge => {
             const page = badge.getAttribute('data-page');
-            if (page) {
-                // 添加点击事件
-                badge.addEventListener('click', function () {
-                    // 调用 switchPdfView 函数跳转到细则对应页面
-                    if (typeof switchPdfView === 'function') {
-                        switchPdfView('rules', parseInt(page));
-                        // 视觉反馈
-                        this.style.background = '#1d4ed8';
-                        setTimeout(() => {
-                            this.style.background = '#3b82f6';
-                        }, 300);
-                    } else {
-                        console.error('switchPdfView function not found');
-                    }
-                });
 
-                // 添加悬停效果
+            if (page && !badge.getAttribute('data-styled')) {
+                // 标记已初始化样式
+                badge.setAttribute('data-styled', 'true');
+
+                // 基础样式
+                badge.style.cursor = 'pointer';
+                badge.style.transition = 'all 0.2s';
+                badge.title = `点击跳转到细则第 ${page} 页`;
+
+                // 鼠标悬停效果
                 badge.addEventListener('mouseenter', function () {
                     this.style.background = '#2563eb';
                     this.style.transform = 'translateY(-2px)';
@@ -36,24 +52,18 @@ document.addEventListener('DOMContentLoaded', function () {
                     this.style.transform = 'translateY(0)';
                     this.style.boxShadow = 'none';
                 });
-
-                // 添加样式
-                badge.style.cursor = 'pointer';
-                badge.style.transition = 'all 0.2s';
-                badge.title = `点击跳转到细则第 ${page} 页`;
             }
         });
     }
 
-    // 初始添加
-    addPageClickHandlers();
+    // 初始化
+    initPageBadgeStyles();
 
-    // 监听内容变化,重新添加事件处理器
+    // 监听内容变化,为新添加的页码标签初始化样式
     const observer = new MutationObserver(function (mutations) {
-        addPageClickHandlers();
+        initPageBadgeStyles();
     });
 
-    // 观察主内容区域的变化
     const mainContent = document.querySelector('.main-content') || document.body;
     observer.observe(mainContent, {
         childList: true,

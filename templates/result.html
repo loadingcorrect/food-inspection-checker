@@ -819,7 +819,7 @@
                   <th style="width:120px">标准编号</th>
                   <th style="width:100px">状态</th>
                   <th>详细信息</th>
-                  <th style="width:160px">截图/下载</th>
+                  <th style="width:120px">操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -844,10 +844,6 @@
                            ${info.screenshot_path ?
             `<a href="${info.screenshot_path}" target="_blank" class="btn-icon-sm" title="查看截图"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></a>`
             : '<span class="disabled-icon" title="无截图">📷</span>'}
-                           
-                           ${info.download_path ?
-            `<a href="${info.download_path}" download class="btn-icon-sm" title="下载标准"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></a>`
-            : '<span class="disabled-icon" title="无下载">⬇️</span>'}
                            
                            ${info.detail_url ?
             `<a href="${info.detail_url}" target="_blank" class="btn-icon-sm" title="查看详情页">🔗</a>`
